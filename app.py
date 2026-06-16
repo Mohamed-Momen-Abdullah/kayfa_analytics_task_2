@@ -92,8 +92,8 @@ df, concept_stats, clean_grades, assignments, attendance, concepts, q12_data, gr
 color_map = {"Cluster 3": "#4B7FA1", "Cluster 2": "#D56D58", "Cluster 1": "#6B9080", "Cluster 0": "#F4A261"}
 
 # --- 3. DASHBOARD PAGES ---
-
-def page_main_dashboard():
+def page_dashboard_overview():
+    # --- TOP SECTION: MAIN DASHBOARD METRICS ---
     col_text, col_logo = st.columns([4, 1])
     with col_text:
         st.title("Kayfa-Internship Task 2: Data Analysis and Recommendations")
@@ -114,158 +114,42 @@ def page_main_dashboard():
     c4.metric("Severely At-Risk Students", f"{len(df[df['cluster_name'] == 'Cluster 2']):,}", "Cluster 2 Segment", delta_color="inverse")
     c5.metric("Lowest Performing Course", "Digital Marketing", "Urgent curriculum review needed", delta_color="off")
     c6.metric("Highest Failure Concept", "Recursion", "85.3% Failure Rate", delta_color="inverse")
+    
     st.divider()
 
-    tab1, tab2 = st.tabs(["📊 Segment Distributions", "📈 Grade Distribution"])
-    with tab1:
-        pie_counts = df['cluster_name'].value_counts().reset_index()
-        pie_counts.columns = ['Segment', 'Count']
-        st.plotly_chart(px.pie(pie_counts, values='Count', names='Segment', hole=0.4, color='Segment', color_discrete_map=color_map, labels=CHART_LABELS), width="stretch")
-    with tab2:
+    # --- MIDDLE SECTION: CHARTS ---
+    # Put the charts side-by-side using columns
+    col_chart1, col_chart2 = st.columns(2)
+    
+    with col_chart1:
+        st.subheader("🚨 Urgent Intervention List")
+        top_10 = df.sort_values('risk_score', ascending=True).tail(10)
+        fig_risk = px.bar(
+            top_10, x='risk_score', y='full_name', orientation='h', color='risk_score', 
+            hover_data=['group_name', 'failed_concepts'], labels=CHART_LABELS,
+        )
+        st.plotly_chart(fig_risk, width="stretch")
+        
+    with col_chart2:
+        st.subheader("📈 Grade Distribution")
         st.plotly_chart(px.box(df, x="category", y="avg_grade", color="category", labels=CHART_LABELS), width="stretch")
 
-def page_q1():
-    st.title("1️⃣ Q1: Attendance Anomalies")
-    st.markdown("What is the attendance rate per group, and which groups sit well below the platform average?")
-    platform_avg = df['attendance_rate'].mean()
-    group_att = df.groupby('group_name')['attendance_rate'].mean().reset_index().sort_values('attendance_rate')
-    fig = px.bar(group_att, x='attendance_rate', y='group_name', orientation='h', color='attendance_rate', color_continuous_scale="RdYlGn", labels=CHART_LABELS)
-    fig.add_vline(x=platform_avg, line_dash="dash", line_color="white", annotation_text=f"Avg: {platform_avg:.1%}")
-    fig.update_layout(xaxis_tickformat='.1%')
-    st.plotly_chart(fig, width="stretch")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> The platform average attendance is 76.8%. Group 10 (C007) and Group 07 (C005) are severe underperformers, dropping to ~65% and ~60% respectively.</div>", unsafe_allow_html=True)
+    st.divider()
 
-def page_q2():
-    st.title("2️⃣ Q2: Score Volatility")
-    st.markdown("How are scores distributed by assessment type? Where is performance most volatile?")
-    st.plotly_chart(px.box(clean_grades, x='type', y='score', color='type', labels=CHART_LABELS), width="stretch")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> Assignments show the highest volatility and the lowest overall performance, indicating students struggle significantly more with take-home assignments than structured exams.</div>", unsafe_allow_html=True)
-
-def page_q3():
-    st.title("3️⃣ Q3: Course Grade Spread")
-    st.markdown("Which course has the highest and lowest average grade?")
-    course_order = df.groupby('course_name')['avg_grade'].median().sort_values().index
-    st.plotly_chart(px.box(df, x='course_name', y='avg_grade', color='course_name', category_orders={'course_name': course_order}, labels=CHART_LABELS), width="stretch")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> Machine Learning Basics has the highest median grade (~73), while Digital Marketing is the lowest performing by a wide margin (median below 60).</div>", unsafe_allow_html=True)
-
-def page_q4():
-    st.title("4️⃣ Q4: Attendance vs Grades")
-    st.markdown("Is there a relationship between a student’s attendance rate and their average grade?")
-    corr = df['attendance_rate'].corr(df['avg_grade'])
-    fig = px.scatter(df, x='attendance_rate', y='avg_grade', opacity=0.7, labels=CHART_LABELS)
-    fig.update_layout(xaxis_tickformat='.0%')
-    st.plotly_chart(fig, width="stretch")
-    st.markdown(f"<div class='insight-box'><strong>Insight:</strong> There is a moderate positive relationship (Pearson correlation: {corr:.2f}). As attendance increases, grades generally trend higher, but simply showing up doesn't guarantee a perfect score.</div>", unsafe_allow_html=True)
-
-def page_q5():
-    st.title("5️⃣ Q5: Engagement Drivers")
-    st.markdown("Does engagement relate to academic performance?")
-    corr_matrix = df[['avg_grade', 'attendance_rate', 'video_duration_mins', 'forum_post']].corr().round(2)
-    # Rename index and columns to avoid snake_case on the heatmap axes
-    corr_matrix.columns = [CHART_LABELS.get(c, c) for c in corr_matrix.columns]
-    corr_matrix.index = [CHART_LABELS.get(c, c) for c in corr_matrix.index]
-    st.plotly_chart(px.imshow(corr_matrix, text_auto=True, color_continuous_scale='RdBu_r', aspect="auto"), width="stretch")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> Attendance is the strongest predictor of grades (0.47), followed closely by video watch time (0.40). Simply logging into the platform is the weakest indicator.</div>", unsafe_allow_html=True)
-
-def page_q6():
-    st.title("6️⃣ Q6: Curriculum Weak Spots")
-    st.markdown("Which concepts have the highest failure rate?")
-    top_failed = concept_stats[concept_stats['total_attempts'] > 15].sort_values('failure_rate', ascending=False).head(10)
-    fig = px.bar(top_failed, x='concept_name', y='failure_rate', color='course_id', text_auto='.1%', labels=CHART_LABELS)
-    fig.update_layout(yaxis_tickformat='.0%')
-    st.plotly_chart(fig, width="stretch")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> 'Recursion' (Course C002) is the absolute biggest curriculum weak spot, boasting a massive 85.3% failure rate.</div>", unsafe_allow_html=True)
-
-def page_q7():
-    st.title("7️⃣ Q7: Mastery Over Time")
-    st.markdown("For that weakest concept (Recursion), how does cohort mastery change over time?")
-    weak_data = concepts[concepts['concept_name'] == 'Recursion'].sort_values('timestamp')
-    mastery_trend = weak_data.groupby('assessment_id').agg(avg_score=('score_pct', 'mean'), date=('timestamp', 'min')).sort_values('date').reset_index()
-    st.plotly_chart(px.line(mastery_trend, x='assessment_id', y='avg_score', markers=True, labels=CHART_LABELS), width="stretch")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> Mastery remains completely stagnant. Across three different assessments throughout the term, the average score hovers in a totally flat line (~45%).</div>", unsafe_allow_html=True)
-
-def page_q8():
-    st.title("8️⃣ Q8: The Cost of Procrastination")
-    st.markdown("Do students who submit assignments late tend to score lower?")
-    assign_grades = assignments.merge(clean_grades[['student_id', 'assessment_id', 'score']], on=['student_id', 'assessment_id'], how='inner')
-    st.plotly_chart(px.box(assign_grades, x='is_late', y='score', color='is_late', labels=CHART_LABELS), width="stretch")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> Yes, late submitters score significantly lower. The median score for on-time submissions is roughly 67, while late submissions drop to 62.</div>", unsafe_allow_html=True)
-
-def page_q9():
-    st.title("9️⃣ Q9: The Holiday Dip")
-    st.markdown("Plot attendance over the 6-month term. Is there a window where the cohort dips at once?")
-    weekly_att = attendance.groupby(pd.Grouper(key='session_datetime', freq='W-MON'))['is_present'].mean().reset_index()
-    fig = px.line(weekly_att, x='session_datetime', y='is_present', markers=True, labels=CHART_LABELS)
-    fig.update_layout(yaxis_tickformat='.0%')
-    st.plotly_chart(fig, width="stretch")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> A massive dip occurs in mid-March 2026, where attendance plummets from 80% to 52%. This perfectly aligns with the end of Ramadan and the Eid al-Fitr holidays.</div>", unsafe_allow_html=True)
-
-def page_q10():
-    st.title("🔟 Q10: Demographics & Age")
-    st.markdown("Bucket students into age bands. Does age relate to outcomes here?")
-    bins = [0, 19, 24, 29, 100]
-    labels = ['Under 20', '20-24', '25-29', '30+']
-    df['age_band'] = pd.cut(df['age'], bins=bins, labels=labels)
-    age_stats = df.groupby('age_band')[['avg_grade', 'attendance_rate']].mean().reset_index()
-    st.plotly_chart(px.bar(age_stats, x='age_band', y='avg_grade', color='attendance_rate', text_auto='.1f', labels=CHART_LABELS), width="stretch")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> Older adult learners are more reliable. The 30+ age band jumps to the highest attendance rate (over 80%) and the highest average grade (74.5).</div>", unsafe_allow_html=True)
-
-def page_q11():
-    st.title("1️⃣1️⃣ Q11: Behavioral Segmentation")
-    st.markdown("Describe the segments based on attendance, engagement, grades, and failed concepts.")
-    features = ['attendance_rate', 'avg_grade', 'video_duration_mins', 'failed_concepts']
-    cluster_profile = df.groupby('cluster_name')[features].mean().reset_index()
-    cluster_melted = cluster_profile.melt(id_vars='cluster_name', var_name='Metric', value_name='Average Value')
-    # Clean the snake_case from the melted column
-    cluster_melted['Metric'] = cluster_melted['Metric'].replace(CHART_LABELS)
-    st.plotly_chart(px.bar(cluster_melted, x='cluster_name', y='Average Value', color='Metric', barmode='group', labels=CHART_LABELS), width="stretch")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> Cluster 2 is the 'Disengaged At-Risk' cohort (lowest attendance, massive failed concepts). Cluster 3 represents our 'High-Achievers' (high attendance, high grades, low failures).</div>", unsafe_allow_html=True)
-
-def page_q12():
-    st.title("1️⃣2️⃣ Q12: Administrative Integrity")
-    st.markdown("Compute true group sizes and compare them to self-reported counts.")
-    q12_melted = q12_data.melt(id_vars=['group_id'], value_vars=['stated_num_students', 'actual_num'], var_name='Metric', value_name='Headcount')
-    # Clean the snake_case from the melted column
-    q12_melted['Metric'] = q12_melted['Metric'].replace({'stated_num_students': 'Stated Capacity', 'actual_num': 'Actual Enrollment'})
-    st.plotly_chart(px.bar(q12_melted, x='group_id', y='Headcount', color='Metric', barmode='group', labels=CHART_LABELS), width="stretch")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> Group 05 wildly overreported their class size by 30 students. Group 03 and Group 10 also severely overreported. These instructors must be audited.</div>", unsafe_allow_html=True)
-
-def page_q13():
-    st.title("1️⃣3️⃣ Q13: The Ghost Class Transfer")
-    st.markdown("Group 10 (Cybersecurity) is unviable with only 1 student. Who is their closest concept-profile counterpart?")
-    c1, c2 = st.columns(2)
-    c1.metric("Unviable Student", "Adel AbdelHamid", "Group 10 (Cybersecurity)")
-    c2.metric("Closest Match (Target Transfer)", "Menna Saad", "Group 08 (Machine Learning)")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> By calculating Euclidean distance across all concept mastery scores, Adel's cognitive profile is mathematically closest to Menna Saad. Group 10 should be dissolved and Adel transferred to Group 08.</div>", unsafe_allow_html=True)
-
-def page_q14():
-    st.title("🚨 Q14: Urgent Intervention List")
-    st.markdown("Top 10 at-risk students based on combined low attendance, low engagement, and failed concepts.")
-    top_10 = df.sort_values('risk_score', ascending=True).tail(10)
-    fig = px.bar(top_10, x='risk_score', y='full_name', orientation='h', color='risk_score', hover_data=['group_name', 'failed_concepts'], labels=CHART_LABELS)
-    st.plotly_chart(fig, width="stretch")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> Visualizing the risk scores highlights Hassan Nasr as the #1 flight risk. More critically, 8 out of the top 10 at-risk students belong to Group 07, indicating a systemic instructor failure.</div>", unsafe_allow_html=True)
-
-def page_q15():
-    st.title("📉 Q15: Cohort Trajectories")
-    st.markdown("Track each group’s average grade across successive assessments. Who is trending down?")
-    st.plotly_chart(px.line(group_trends, x='date', y='score', color='group_name', markers=True, labels=CHART_LABELS), width="stretch")
-    st.markdown("<div class='insight-box'><strong>Insight:</strong> Group 07 (C005) is in a severe, sustained downward slide. They sit at the absolute bottom of platform performance and fail to recover after the holiday dip.</div>", unsafe_allow_html=True)
-
-def page_hr_advice():
-    st.title("💡 Strategic Academic & HR Action Plan")
+    # --- BOTTOM SECTION: HR ADVICE & ACTION PLAN ---
+    st.title("💡 Strategic Academic & Insight Recommendation Plan")
     st.markdown("Based on the data-driven insights from the 15 analytical questions, here is the prioritized roadmap for intervention.")
 
     # 1. Immediate Interventions
     st.header("1. Immediate Interventions (Urgent)")
-    c1, c2 = st.columns(2)
-    with c1:
+    c1_hr, c2_hr = st.columns(2)
+    with c1_hr:
         st.error("🚨 Address the 'Group 07' Systemic Failure")
         st.markdown("""
         - **Data Point:** Q14 & Q15 show Group 07 is in a sustained downward slide and contains 80% of our top 10 at-risk students.
         - **Action:** Launch an immediate performance audit of the instructors assigned to Group 07. Initiate a mandatory 1-on-1 intervention for the at-risk students identified.
         """)
-    with c2:
+    with c2_hr:
         st.warning("⚠️ Resolve Ghost Groups & Audits")
         st.markdown("""
         - **Data Point:** Q12 revealed groups (G05, G03, G10) significantly over-reported headcount. 
@@ -282,14 +166,14 @@ def page_hr_advice():
     
     # 3. Student Engagement & Retention
     st.header("3. Student Engagement & Retention")
-    col3, col4 = st.columns(2)
-    with col3:
+    col3_hr, col4_hr = st.columns(2)
+    with col3_hr:
         st.success("🎯 Targeted Proactive Support")
         st.markdown("""
         - **Data Point:** Q8 (Late submissions = lower scores) and Q4/Q5 (Attendance = grades).
         - **Action:** Implement automated 'nudge' emails for students who consistently submit assignments close to the deadline or show early signs of attendance drops.
         """)
-    with col4:
+    with col4_hr:
         st.markdown("#### Segmented Outreach")
         st.markdown("""
         - **Cluster 2 (At-Risk):** Mandatory academic mentoring.
@@ -304,12 +188,180 @@ def page_hr_advice():
     - **Holiday Resiliency:** Q9 shows a massive dip during holiday windows. Proactively adjust course timelines to ensure major assessments do not fall immediately before or after religious holiday periods to prevent the "holiday slide."
     """)
 
+def page_q1():
+    st.title("1️⃣ Q1: Attendance Anomalies")
+    platform_avg = df['attendance_rate'].mean()
+    group_att = df.groupby('group_name')['attendance_rate'].mean().reset_index().sort_values('attendance_rate')
+    fig = px.bar(
+        group_att, x='attendance_rate', y='group_name', orientation='h', 
+        color='attendance_rate', color_continuous_scale="RdYlGn", labels=CHART_LABELS,
+        title="What is the attendance rate per group, and which groups sit well below the platform average?"
+    )
+    fig.add_vline(x=platform_avg, line_dash="dash", line_color="white", annotation_text=f"Avg: {platform_avg:.1%}")
+    fig.update_layout(xaxis_tickformat='.1%')
+    st.plotly_chart(fig, width="stretch")
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> The platform average attendance is 76.8%. Group 10 (C007) and Group 07 (C005) are severe underperformers, dropping to ~65% and ~60% respectively.</div>", unsafe_allow_html=True)
+
+def page_q2():
+    st.title("2️⃣ Q2: Score Volatility")
+    st.plotly_chart(px.box(
+        clean_grades, x='type', y='score', color='type', labels=CHART_LABELS,
+        title="How are scores distributed by assessment type? Where is performance most volatile?"
+    ), width="stretch")
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> Assignments show the highest volatility and the lowest overall performance, indicating students struggle significantly more with take-home assignments than structured exams.</div>", unsafe_allow_html=True)
+
+def page_q3():
+    st.title("3️⃣ Q3: Course Grade Spread")
+    course_order = df.groupby('course_name')['avg_grade'].median().sort_values().index
+    st.plotly_chart(px.box(
+        df, x='course_name', y='avg_grade', color='course_name', category_orders={'course_name': course_order}, labels=CHART_LABELS,
+        title="Which course has the highest and lowest average grade?"
+    ), width="stretch")
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> Machine Learning Basics has the highest median grade (~73), while Digital Marketing is the lowest performing by a wide margin (median below 60).</div>", unsafe_allow_html=True)
+
+def page_q4():
+    st.title("4️⃣ Q4: Attendance vs Grades")
+    corr = df['attendance_rate'].corr(df['avg_grade'])
+    fig = px.scatter(
+        df, x='attendance_rate', y='avg_grade', opacity=0.7, labels=CHART_LABELS,
+        title="Is there a relationship between a student’s attendance rate and their average grade?"
+    )
+    fig.update_layout(xaxis_tickformat='.0%')
+    st.plotly_chart(fig, width="stretch")
+    st.markdown(f"<div class='insight-box'><strong>Insight:</strong> There is a moderate positive relationship (Pearson correlation: {corr:.2f}). As attendance increases, grades generally trend higher, but simply showing up doesn't guarantee a perfect score.</div>", unsafe_allow_html=True)
+
+def page_q5():
+    st.title("5️⃣ Q5: Engagement Drivers")
+    corr_matrix = df[['avg_grade', 'attendance_rate', 'video_duration_mins', 'forum_post']].corr().round(2)
+    # Rename index and columns to avoid snake_case on the heatmap axes
+    corr_matrix.columns = [CHART_LABELS.get(c, c) for c in corr_matrix.columns]
+    corr_matrix.index = [CHART_LABELS.get(c, c) for c in corr_matrix.index]
+    st.plotly_chart(px.imshow(
+        corr_matrix, text_auto=True, color_continuous_scale='RdBu_r', aspect="auto",
+        title="Does engagement relate to academic performance?"
+    ), width="stretch")
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> Attendance is the strongest predictor of grades (0.47), followed closely by video watch time (0.40). Simply logging into the platform is the weakest indicator.</div>", unsafe_allow_html=True)
+
+def page_q6():
+    st.title("6️⃣ Q6: Curriculum Weak Spots")
+    top_failed = concept_stats[concept_stats['total_attempts'] > 15].sort_values('failure_rate', ascending=False).head(10)
+    fig = px.bar(
+        top_failed, x='concept_name', y='failure_rate', color='course_id', text_auto='.1%', labels=CHART_LABELS,
+        title="Which concepts have the highest failure rate?"
+    )
+    fig.update_layout(yaxis_tickformat='.0%')
+    st.plotly_chart(fig, width="stretch")
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> 'Recursion' (Course C002) is the absolute biggest curriculum weak spot, boasting a massive 85.3% failure rate.</div>", unsafe_allow_html=True)
+
+def page_q7():
+    st.title("7️⃣ Q7: Mastery Over Time")
+    weak_data = concepts[concepts['concept_name'] == 'Recursion'].sort_values('timestamp')
+    mastery_trend = weak_data.groupby('assessment_id').agg(avg_score=('score_pct', 'mean'), date=('timestamp', 'min')).sort_values('date').reset_index()
+    st.plotly_chart(px.line(
+        mastery_trend, x='assessment_id', y='avg_score', markers=True, labels=CHART_LABELS,
+        title="For that weakest concept (Recursion), how does cohort mastery change over time?"
+    ), width="stretch")
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> Mastery remains completely stagnant. Across three different assessments throughout the term, the average score hovers in a totally flat line (~45%).</div>", unsafe_allow_html=True)
+
+def page_q8():
+    st.title("8️⃣ Q8: The Cost of Procrastination")
+    assign_grades = assignments.merge(clean_grades[['student_id', 'assessment_id', 'score']], on=['student_id', 'assessment_id'], how='inner')
+    st.plotly_chart(px.box(
+        assign_grades, x='is_late', y='score', color='is_late', labels=CHART_LABELS,
+        title="Do students who submit assignments late tend to score lower?"
+    ), width="stretch")
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> Yes, late submitters score significantly lower. The median score for on-time submissions is roughly 67, while late submissions drop to 62.</div>", unsafe_allow_html=True)
+
+def page_q9():
+    st.title("9️⃣ Q9: The Holiday Dip")
+    weekly_att = attendance.groupby(pd.Grouper(key='session_datetime', freq='W-MON'))['is_present'].mean().reset_index()
+    fig = px.line(
+        weekly_att, x='session_datetime', y='is_present', markers=True, labels=CHART_LABELS,
+        title="Plot attendance over the 6-month term. Is there a window where the cohort dips at once?"
+    )
+    fig.update_layout(yaxis_tickformat='.0%')
+    st.plotly_chart(fig, width="stretch")
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> A massive dip occurs in mid-March 2026, where attendance plummets from 80% to 52%. This perfectly aligns with the end of Ramadan and the Eid al-Fitr holidays.</div>", unsafe_allow_html=True)
+
+def page_q10():
+    st.title("🔟 Q10: Demographics & Age")
+    bins = [0, 19, 24, 29, 100]
+    labels = ['Under 20', '20-24', '25-29', '30+']
+    df['age_band'] = pd.cut(df['age'], bins=bins, labels=labels)
+    age_stats = df.groupby('age_band')[['avg_grade', 'attendance_rate']].mean().reset_index()
+    st.plotly_chart(px.bar(
+        age_stats, x='age_band', y='avg_grade', color='attendance_rate', text_auto='.1f', labels=CHART_LABELS,
+        title="Bucket students into age bands. Does age relate to outcomes here?"
+    ), width="stretch")
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> Older adult learners are more reliable. The 30+ age band jumps to the highest attendance rate (over 80%) and the highest average grade (74.5).</div>", unsafe_allow_html=True)
+
+def page_q11():
+    st.title("1️⃣1️⃣ Q11: Behavioral Segmentation")
+    features = ['attendance_rate', 'avg_grade', 'video_duration_mins', 'failed_concepts']
+    cluster_profile = df.groupby('cluster_name')[features].mean().reset_index()
+    cluster_melted = cluster_profile.melt(id_vars='cluster_name', var_name='Metric', value_name='Average Value')
+    
+    # Clean the snake_case from the melted column
+    cluster_melted['Metric'] = cluster_melted['Metric'].replace(CHART_LABELS)
+    
+    # --- NEW: Map technical cluster names to informative personas ---
+    persona_mapping = {
+        "Cluster 0": "Average Performers",
+        "Cluster 1": "Efficient Learners",
+        "Cluster 2": "Disengaged At-Risk",
+        "Cluster 3": "High-Achievers"
+    }
+    cluster_melted['cluster_name'] = cluster_melted['cluster_name'].replace(persona_mapping)
+    # ---------------------------------------------------------------
+
+    st.plotly_chart(px.bar(
+        cluster_melted, x='cluster_name', y='Average Value', color='Metric', barmode='group', labels=CHART_LABELS,
+        title="Describe the segments based on attendance, engagement, grades, and failed concepts."
+    ), width="stretch")
+    
+    # Updated the insight text to match the new names!
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> The 'Disengaged At-Risk' cohort suffers from the lowest attendance and massive failed concepts, while the 'High-Achievers' boast peak attendance, highest grades, and the fewest failures.</div>", unsafe_allow_html=True)
+def page_q12():
+    st.title("1️⃣2️⃣ Q12: Administrative Integrity")
+    q12_melted = q12_data.melt(id_vars=['group_id'], value_vars=['stated_num_students', 'actual_num'], var_name='Metric', value_name='Headcount')
+    # Clean the snake_case from the melted column
+    q12_melted['Metric'] = q12_melted['Metric'].replace({'stated_num_students': 'Stated Capacity', 'actual_num': 'Actual Enrollment'})
+    st.plotly_chart(px.bar(
+        q12_melted, x='group_id', y='Headcount', color='Metric', barmode='group', labels=CHART_LABELS,
+        title="Compute true group sizes and compare them to self-reported counts."
+    ), width="stretch")
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> Group 05 wildly overreported their class size by 30 students. Group 03 and Group 10 also severely overreported. These instructors must be audited.</div>", unsafe_allow_html=True)
+
+def page_q13():
+    st.title("1️⃣3️⃣ Q13: The Ghost Class Transfer")
+    st.markdown("Group 10 (Cybersecurity) is unviable with only 1 student. Who is their closest concept-profile counterpart?")
+    c1, c2 = st.columns(2)
+    c1.metric("Unviable Student", "Adel AbdelHamid", "Group 10 (Cybersecurity)")
+    c2.metric("Closest Match (Target Transfer)", "Menna Saad", "Group 08 (Machine Learning)")
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> By calculating Euclidean distance across all concept mastery scores, Adel's cognitive profile is mathematically closest to Menna Saad. Group 10 should be dissolved and Adel transferred to Group 08. And Since there are no other Cypersecurity Class Then Group 8 should be the most suitable Group for him.</div>", unsafe_allow_html=True)
+
+def page_q14():
+    st.title("🚨 Q14: Urgent Intervention List")
+    top_10 = df.sort_values('risk_score', ascending=True).tail(10)
+    fig = px.bar(
+        top_10, x='risk_score', y='full_name', orientation='h', color='risk_score', hover_data=['group_name', 'failed_concepts'], labels=CHART_LABELS,
+        title="Top 10 at-risk students based on combined low attendance, low engagement, and failed concepts."
+    )
+    st.plotly_chart(fig, width="stretch")
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> Visualizing the risk scores highlights Hassan Nasr as the #1 flight risk. More critically, 8 out of the top 10 at-risk students belong to Group 07, indicating a systemic instructor failure.</div>", unsafe_allow_html=True)
+
+def page_q15():
+    st.title("📉 Q15: Cohort Trajectories")
+    st.plotly_chart(px.line(
+        group_trends, x='date', y='score', color='group_name', markers=True, labels=CHART_LABELS,
+        title="Track each group’s average grade across successive assessments. Who is trending down?"
+    ), width="stretch")
+    st.markdown("<div class='insight-box'><strong>Insight:</strong> Group 07 (C005) is in a severe, sustained downward slide. They sit at the absolute bottom of platform performance and fail to recover after the holiday dip.</div>", unsafe_allow_html=True)
 # --- 4. RENDER NAVIGATION ---
 pg = st.navigation(
     {
         "Executive Overview": [
-            st.Page(page_main_dashboard, title="Main Dashboard", icon="📊"),
-            st.Page(page_hr_advice, title="Recommendations", icon="💡")
+            st.Page(page_dashboard_overview, title="Dashboard Overview", icon="📊")
         ],
         "Platform Analytics (Q1-Q8)": [
             st.Page(page_q1, title="Q1: Group Attendance", icon="1️⃣"),
