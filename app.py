@@ -70,7 +70,7 @@ def page_main_dashboard():
     # Adjusting columns so the logo sits on the right side of the main title
     col_text, col_logo = st.columns([4, 1])
     with col_text:
-        st.title("Kayfa Platform: Academic Performance & Cohort Health")
+        st.title("Kayfa-Internship Task 2: Academic Performance and Recommendations")
         st.markdown("An interactive exploratory analysis identifying curriculum weak spots and at-risk student profiles.")
     with col_logo:
         if os.path.exists("kayfa_logo_light.png"):
