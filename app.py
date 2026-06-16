@@ -218,11 +218,67 @@ def page_q15():
     st.markdown("Track each group’s average grade across successive assessments. Who is trending down?")
     st.plotly_chart(px.line(group_trends, x='date', y='score', color='group_name', markers=True), width="stretch")
     st.markdown("<div class='insight-box'><strong>Insight:</strong> Group 07 (C005) is in a severe, sustained downward slide. They sit at the absolute bottom of platform performance and fail to recover after the holiday dip.</div>", unsafe_allow_html=True)
+def page_hr_advice():
+    st.title("💡 Strategic Academic & HR Action Plan")
+    st.markdown("Based on the data-driven insights from the 15 analytical questions, here is the prioritized roadmap for intervention.")
 
+    # 1. Immediate Interventions (The "Firefighting")
+    st.header("1. Immediate Interventions (Urgent)")
+    c1, c2 = st.columns(2)
+    with c1:
+        st.error("🚨 Address the 'Group 07' Systemic Failure")
+        st.markdown("""
+        - **Data Point:** Q14 & Q15 show Group 07 is in a sustained downward slide and contains 80% of our top 10 at-risk students.
+        - **Action:** Launch an immediate performance audit of the instructors assigned to Group 07. Initiate a mandatory 1-on-1 intervention for the at-risk students identified.
+        """)
+    with c2:
+        st.warning("⚠️ Resolve Ghost Groups & Audits")
+        st.markdown("""
+        - **Data Point:** Q12 revealed groups (G05, G03, G10) significantly over-reported headcount. 
+        - **Action:** Perform an administrative audit to align stated headcount with actual enrollments. Dissolve unviable ghost groups (like G10) and reallocate resources/students (Adel -> G08) immediately.
+        """)
+
+    # 2. Curriculum & Learning Design
+    st.header("2. Curriculum & Learning Design")
+    st.info("📚 Fix the 'Recursion' Knowledge Gap")
+    st.markdown("""
+    - **Data Point:** Q6 & Q7 show 'Recursion' has an 85% failure rate, and mastery is stagnant across the term.
+    - **Action:** The current pedagogy for Recursion is failing. **Stop existing instruction immediately.** Redevelop the curriculum module to include more hands-on practical coding exercises rather than theoretical content.
+    """)
+    
+    # 3. Student Engagement & Retention
+    st.header("3. Student Engagement & Retention")
+    col3, col4 = st.columns(2)
+    with col3:
+        st.success("🎯 Targeted Proactive Support")
+        st.markdown("""
+        - **Data Point:** Q8 (Late submissions = lower scores) and Q4/Q5 (Attendance = grades).
+        - **Action:** Implement automated 'nudge' emails for students who consistently submit assignments close to the deadline or show early signs of attendance drops.
+        """)
+    with col4:
+        st.markdown("#### Segmented Outreach")
+        st.markdown("""
+        - **Cluster 2 (At-Risk):** Mandatory academic mentoring.
+        - **Cluster 1 (Social Learners):** Increase forum engagement/peer-to-peer activities.
+        - **Cluster 3 (High-Achievers):** Provide advanced elective materials to maintain interest.
+        """)
+
+    # 4. Long-Term Policy
+    st.header("4. Policy Adjustments")
+    st.markdown("""
+    - **Age-Based Engagement:** Since the 30+ demographic is our most reliable cohort (Q10), tailor future recruitment efforts toward this segment.
+    - **Holiday Resiliency:** Q9 shows a massive dip during holiday windows. Proactively adjust course timelines to ensure major assessments do not fall immediately before or after religious holiday periods to prevent the "holiday slide."
+    """)
+
+# To add this to your navigation:
+# st.Page(page_hr_advice, title="HR Advices based on data", icon="💡")
 # --- 4. RENDER NAVIGATION ---
 pg = st.navigation(
     {
-        "Executive Overview": [st.Page(page_main_dashboard, title="Main Dashboard", icon="📊")],
+        "Executive Overview": [
+            st.Page(page_main_dashboard, title="Main Dashboard", icon="📊"),
+            st.Page(page_hr_advice, title="Recommendations", icon="💡")
+        ],
         "Platform Analytics (Q1-Q8)": [
             st.Page(page_q1, title="Q1: Group Attendance", icon="1️⃣"),
             st.Page(page_q2, title="Q2: Score Volatility", icon="2️⃣"),
